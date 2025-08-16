@@ -23,6 +23,7 @@
     "@supabase/supabase-js": "^2.55.0",
     "@types/node": "^20.10.5",
     "@types/pg": "^8.10.9",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
@@ -44,7 +45,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jest": "^29.5.8",
