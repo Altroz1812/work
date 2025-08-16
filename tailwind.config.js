@@ -9,6 +9,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        card: 'hsl(var(--card))',
+        'card-foreground': 'hsl(var(--card-foreground))',
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        'muted-foreground': 'hsl(var(--muted-foreground))',
+        muted: 'hsl(var(--muted))',
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',

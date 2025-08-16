@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --kill-others-on-fail",
     "dev:backend": "tsx watch src/server.ts",
     "dev:frontend": "next dev -p 3001",
     "build": "tsc && next build",
