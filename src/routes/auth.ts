@@ -32,6 +32,8 @@ const router = Router();
 router.post('/login', asyncHandler(async (req, res) => {
   const { email, password, tenant } = req.body;
 
+  console.log('Login attempt:', { email, tenant });
+
   if (!email || !password || !tenant) {
     return res.status(400).json({
       success: false,
@@ -39,6 +41,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     });
   }
 
+  try {
   // Find tenant
   const { data: tenantData } = await supabase
     .from('tenants')
@@ -99,6 +102,12 @@ router.post('/login', asyncHandler(async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
+    console.log('Tenant lookup result:', tenantData);
+
+    console.log('User lookup result:', user ? 'Found' : 'Not found');
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('Password validation:', validPassword ? 'Valid' : 'Invalid');
+    
         name: user.name,
         role: user.role,
         tenantId: user.tenant_id
@@ -106,6 +115,13 @@ router.post('/login', asyncHandler(async (req, res) => {
       tenant: tenantData
     }
   });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during login'
+    });
+  }
 }));
 
 export { router as authRoutes };
