@@ -17,6 +17,12 @@ import { requestLogger } from './middleware/logger.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Log environment status
+console.log('🔧 Environment check:');
+console.log('- SUPABASE_URL:', !!process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing');
+console.log('- SUPABASE_ANON_KEY:', !!process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
+console.log('- JWT_SECRET:', !!process.env.JWT_SECRET ? '✅ Set' : '❌ Missing');
+
 // Security middleware
 app.use(helmet());
 app.use(cors({

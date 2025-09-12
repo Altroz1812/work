@@ -28,7 +28,9 @@ export default function LoginPage() {
         body: JSON.stringify(formData),
       });
 
+      console.log('Login response status:', response.status);
       const result = await response.json();
+      console.log('Login result:', result);
 
       if (result.success) {
         localStorage.setItem('token', result.data.token);

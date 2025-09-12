@@ -4,6 +4,15 @@ import { supabase } from '../lib/supabase.js';
 async function seedDatabase() {
   try {
     console.log('🌱 Starting database seeding...');
+    
+    // Test Supabase connection first
+    const { error: connectionError } = await supabase.from('tenants').select('count').limit(1);
+    if (connectionError) {
+      console.error('❌ Supabase connection failed:', connectionError.message);
+      console.error('Please check your SUPABASE_URL and SUPABASE_ANON_KEY in .env file');
+      return;
+    }
+    console.log('✅ Supabase connection verified');
 
     // Create demo tenant
     const { data: tenant, error: tenantError } = await supabase
