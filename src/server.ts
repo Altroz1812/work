@@ -18,6 +18,17 @@ import { requestLogger } from './middleware/logger.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Environment validation
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
 // Log environment status
 console.log('🔧 Environment Configuration Check:');
 console.log('- SUPABASE_URL:', !!process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing');
@@ -27,7 +38,11 @@ console.log('- JWT_SECRET:', !!process.env.JWT_SECRET ? '✅ Set' : '❌ Missing
 console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.FRONTEND_URL?.split(',') || ['https://yourdomain.com']
@@ -37,20 +52,33 @@ app.use(cors({
         /^https:\/\/.*\.webcontainer-api\.io$/,
         /^https:\/\/.*\.local-credentialless\.webcontainer-api\.io$/
       ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-  message: 'Too many requests from this IP, please try again later.'
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use('/api', limiter);
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Body parsing with size limits
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // Store raw body for webhook verification if needed
+    (req as any).rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging
 app.use(requestLogger);
@@ -62,13 +90,21 @@ const swaggerOptions = {
     info: {
       title: 'AI Workflow Management System API',
       version: '1.0.0',
-      description: 'Multi-tenant LOS/LMS-ready workflow management system',
+      description: 'Multi-tenant LOS/LMS-ready workflow management system with AI integration',
+      contact: {
+        name: 'API Support',
+        email: 'support@example.com'
+      }
     },
     servers: [
       {
         url: `http://localhost:${PORT}`,
         description: 'Development server',
       },
+      {
+        url: process.env.PRODUCTION_URL || 'https://api.example.com',
+        description: 'Production server',
+      }
     ],
     components: {
       securitySchemes: {
@@ -84,14 +120,28 @@ const swaggerOptions = {
 };
 
 const swaggerSpecs = swaggerJsdoc(swaggerOptions);
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'AI Workflow API Documentation'
+}));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Health check with detailed system info
+app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    version: process.version,
+    memory: process.memoryUsage(),
+    pid: process.pid
+  };
+
+  res.json(healthCheck);
 });
 
-// API routes
+// API routes with proper error boundaries
 app.use('/api/auth', authRoutes);
 app.use('/api/:tenant/workflows', workflowRoutes);
 app.use('/api/:tenant/cases', caseRoutes);
@@ -100,13 +150,56 @@ app.use('/api/:tenant/dashboard', dashboardRoutes);
 app.use('/api/:tenant/documents', documentRoutes);
 app.use('/api/:tenant/users', userRoutes);
 
-// Error handling
+// 404 handler for unmatched routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
+// Global error handling
 app.use(errorHandler);
 
+// Graceful shutdown handling
+const gracefulShutdown = (signal: string) => {
+  console.log(`🛑 Received ${signal}, starting graceful shutdown...`);
+  
+  // Close server
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    process.exit(0);
+  });
+
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
+  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3001'}`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 export default app;

@@ -1,5 +1,5 @@
 import { db } from './connection.js';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -8,15 +8,16 @@ const __dirname = dirname(__filename);
 
 async function migrate() {
   try {
-    console.log('Running database migrations...');
+    console.log('🔄 Running database migrations...');
     
-    const schemaSQL = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
+    // Use async readFile for modern Node.js 20.19 compatibility
+    const schemaSQL = await readFile(join(__dirname, '../migrations/schema.sql'), 'utf-8');
     
     await db.query(schemaSQL);
     
-    console.log('Database migrations completed successfully!');
+    console.log('✅ Database migrations completed successfully!');
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error('❌ Migration failed:', error);
     process.exit(1);
   }
 }
