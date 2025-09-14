@@ -20,6 +20,15 @@ router.use(validateTenant);
 router.post('/', authorize(['Admin']), asyncHandler(async (req: AuthRequest, res) => {
   const { workflowId, name, description, config } = req.body;
 
+  console.log('Creating workflow with data:', { workflowId, name, description, config });
+
+  if (!workflowId || !name || !config) {
+    return res.status(400).json({
+      success: false,
+      message: 'Workflow ID, name, and config are required'
+    });
+  }
+
   const { data, error } = await supabase
     .from('workflow_configs')
     .insert({
@@ -34,12 +43,15 @@ router.post('/', authorize(['Admin']), asyncHandler(async (req: AuthRequest, res
     .single();
 
   if (error) {
+    console.error('Workflow creation error:', error);
     return res.status(400).json({
       success: false,
       message: 'Failed to create workflow',
       error: error.message
     });
   }
+
+  console.log('Workflow created successfully:', data);
 
   res.status(201).json({
     success: true,
